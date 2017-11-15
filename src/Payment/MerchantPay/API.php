@@ -42,6 +42,9 @@ class API extends AbstractAPI
     // api
     const API_SEND = 'https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/transfers';
     const API_QUERY = 'https://api.mch.weixin.qq.com/mmpaymkttransfers/gettransferinfo';
+    const API_GETPUBLICKEY = 'https://fraud.mch.weixin.qq.com/risk/getpublickey';
+    const API_PAYBANK = 'https://api.mch.weixin.qq.com/mmpaysptrans/pay_bank';
+    const API_QUERYBANK = 'https://api.mch.weixin.qq.com/mmpaysptrans/query_bank';
 
     /**
      * API constructor.
@@ -86,6 +89,58 @@ class API extends AbstractAPI
         $params['mch_appid'] = $this->merchant->app_id;
 
         return $this->request(self::API_SEND, $params);
+    }
+
+    /**
+     * getPublicKey MerchantPay.
+     * Notice: the key format is pcks1, you should convert it to pcks8
+     * 
+     * @return \EasyWeChat\Support\Collection
+     *
+     */
+    public function getPublicKey()
+    {
+        $params = [
+            'mch_id' => $this->merchant->merchant_id,
+        ];
+
+        return $this->request(self::API_GETPUBLICKEY, $params);
+    }
+
+    /**
+     * Send MerchantPay.
+     *
+     * @param array $params
+     *
+     * @return \EasyWeChat\Support\Collection
+     */
+    public function sendBank(array $params)
+    {
+        // $response = $this->getPublicKey();
+        // $public_key = trim($response['pub_key'],"\n");
+
+        $filename =  realpath(\Yii::getAlias('@backend').'/../certs/wxpay.pcks8.pem');
+        $pu_key = file_get_contents($filename);
+        openssl_public_encrypt($params['enc_bank_no'], $enc_bank_no, $pu_key, OPENSSL_PKCS1_OAEP_PADDING);//公钥加密  
+        $enc_bank_no = base64_encode($enc_bank_no);
+        openssl_public_encrypt($params['enc_true_name'], $enc_true_name, $pu_key, OPENSSL_PKCS1_OAEP_PADDING);//公钥加密  
+        $enc_true_name = base64_encode($enc_true_name);  
+
+        $params['mch_id'] = $this->merchant->merchant_id;
+        $params['enc_bank_no'] = $enc_bank_no;
+        $params['enc_true_name'] = $enc_true_name;
+
+        return $this->request(self::API_PAYBANK, $params);
+    }
+
+    public function queryBank($mchBillNo)
+    {
+        $params = [
+            'mch_id' => $this->merchant->merchant_id,
+            'partner_trade_no' => $mchBillNo,
+        ];
+
+        return $this->request(self::API_QUERYBANK, $params);
     }
 
     /**
